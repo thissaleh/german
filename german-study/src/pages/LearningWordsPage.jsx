@@ -2,9 +2,12 @@ import React from "react";
 import { Link } from "react-router-dom";
 import "./LearningWordsPage.css";
 import { useLearningWordsPlayer } from "./useLearningWordsPlayer";
+import { PHRASE_LISTS, usePhraseListSelection } from "./phraseLists";
+import { ELEVENLABS_MODEL_NAME, formatVoiceLabel } from "./elevenLabsConfig";
 
 export default function LearningWordsPage() {
-  const p = useLearningWordsPlayer({ contentUrl: "/basics_01.txt" });
+  const [phraseListUrl, setPhraseListUrl] = usePhraseListSelection();
+  const p = useLearningWordsPlayer({ contentUrl: phraseListUrl });
 
   // Focus overlay UI
   if (p.focusMode) {
@@ -51,12 +54,30 @@ export default function LearningWordsPage() {
     <div className="page">
       <div className="topRow">
         <h2 style={{ margin: 0 }}>Learning Words (Big Card)</h2>
-        <Link to="/"><button>Back to Study Page</button></Link>
+        <div>
+          <Link to="/recording-focus"><button>Recording Focus</button></Link>
+          <Link to="/"><button>Back to Study Page</button></Link>
+        </div>
       </div>
 
       <div className="layout">
         {/* LEFT */}
         <div className="left">
+          <label htmlFor="learning-phrase-list">Phrase list:</label>
+          <select
+            id="learning-phrase-list"
+            value={phraseListUrl}
+            onChange={(e) => {
+              p.stopAll();
+              setPhraseListUrl(e.target.value);
+            }}
+          >
+            {PHRASE_LISTS.map((list) => (
+              <option key={list.value} value={list.value}>{list.label}</option>
+            ))}
+          </select>
+          <small>Model: {ELEVENLABS_MODEL_NAME} • German language override</small>
+
           <label>ElevenLabs API Key:</label>
           <input value={p.apiKey} onChange={(e) => p.setApiKey(e.target.value)} type="password" />
 
@@ -66,7 +87,7 @@ export default function LearningWordsPage() {
               <select value={p.voiceId} onChange={(e) => p.setVoiceId(e.target.value)}>
                 {p.voices.map((v) => (
                   <option key={v.voice_id} value={v.voice_id}>
-                    {v.name || v.voice_id}
+                    {formatVoiceLabel(v)}
                   </option>
                 ))}
               </select>
@@ -79,7 +100,7 @@ export default function LearningWordsPage() {
 
           <div className="grid3">
             <div>
-              <label>Speed: <b>{p.speed.toFixed(2)}x</b></label>
+              <label>Playback speed: <b>{p.speed.toFixed(2)}x</b></label>
               <input
                 type="range"
                 min="0.7"

@@ -1,8 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { parseGermanStudyText } from "./parsers"; // adjust path
-
-const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM";
+import { PHRASE_LISTS, usePhraseListSelection } from "./phraseLists";
+import {
+  countGermanVoices,
+  DEFAULT_VOICE,
+  DEFAULT_VOICE_ID,
+  ELEVENLABS_MODEL_ID,
+  ELEVENLABS_MODEL_NAME,
+  formatVoiceLabel,
+  sortVoicesForGerman,
+  V3_VOICE_SETTINGS,
+} from "./elevenLabsConfig";
 
 const DEFAULT_TEXT = `1. Ich – I
 Mein Name ist Joachim und ich komme aus Berlin.
@@ -21,8 +30,8 @@ export default function StudyPage() {
   // UI state
   // =========================
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_ELEVENLABS_API_KEY || "");
-  const [voices, setVoices] = useState([{ voice_id: DEFAULT_VOICE, name: "Default" }]);
-  const [voiceId, setVoiceId] = useState(DEFAULT_VOICE);
+  const [voices, setVoices] = useState([DEFAULT_VOICE]);
+  const [voiceId, setVoiceId] = useState(DEFAULT_VOICE_ID);
   const [voiceStatus, setVoiceStatus] = useState("");
   const [speed, setSpeed] = useState(1.0);
   const [delaySec, setDelaySec] = useState(0.75);
@@ -33,6 +42,7 @@ export default function StudyPage() {
   const [learningWordsMode, setLearningWordsMode] = useState(false);
 
   const [content, setContent] = useState(DEFAULT_TEXT);
+  const [phraseListUrl, setPhraseListUrl] = usePhraseListSelection();
 
   // Status
   const [nowText, setNowText] = useState("—");
@@ -164,7 +174,7 @@ export default function StudyPage() {
   useEffect(() => {
     let alive = true;
 
-    fetch("/basics_01.txt", { cache: "no-store" })
+    fetch(phraseListUrl, { cache: "no-store" })
       .then((r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.text();
@@ -173,13 +183,13 @@ export default function StudyPage() {
         if (alive) setContent(t);
       })
       .catch((e) => {
-        console.warn("Failed to load /basics_01.txt:", e.message);
+        console.warn(`Failed to load ${phraseListUrl}:`, e.message);
       });
 
     return () => {
       alive = false;
     };
-  }, []);
+  }, [phraseListUrl]);
 
   // =========================
   // ElevenLabs API calls
@@ -189,7 +199,7 @@ export default function StudyPage() {
     if (!k) return alert("Paste your ElevenLabs API key first.");
     setVoiceStatus("Loading…");
     try {
-      const res = await fetch("https://api.elevenlabs.io/v1/voices", {
+      const res = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100", {
         method: "GET",
         headers: { "xi-api-key": k },
       });
@@ -198,19 +208,19 @@ export default function StudyPage() {
         throw new Error(`${res.status} ${msg}`);
       }
       const data = await res.json();
-      const list = data.voices || [];
-      setVoices(list.length ? list : [{ voice_id: DEFAULT_VOICE, name: "Default" }]);
+      const list = sortVoicesForGerman(data.voices || []);
+      setVoices(list.length ? list : [DEFAULT_VOICE]);
 
       const keep = list.some((v) => v.voice_id === voiceId);
-      setVoiceId(keep ? voiceId : list[0]?.voice_id || DEFAULT_VOICE);
-      setVoiceStatus(`Loaded ${list.length} voice(s).`);
+      setVoiceId(keep ? voiceId : list[0]?.voice_id || DEFAULT_VOICE_ID);
+      setVoiceStatus(`Loaded ${list.length} voices • German: ${countGermanVoices(list)}`);
     } catch (e) {
       setVoiceStatus("");
       alert("Failed to load voices: " + e.message);
     }
   }
 
-  async function ttsStream(text) {
+  async function ttsStream(text, languageCode = "de") {
     const k = apiKey.trim();
     if (!k) {
       alert("Paste your ElevenLabs API key first.");
@@ -219,8 +229,9 @@ export default function StudyPage() {
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`;
     const body = {
       text,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: { stability: 0.35, similarity_boost: 0.85, speed: Number(speed) || 1.0 },
+      model_id: ELEVENLABS_MODEL_ID,
+      language_code: languageCode,
+      voice_settings: V3_VOICE_SETTINGS,
     };
 
     const res = await fetch(url, {
@@ -237,7 +248,7 @@ export default function StudyPage() {
     return await res.blob();
   }
 
-  async function ttsWithTimestamps(text) {
+  async function ttsWithTimestamps(text, languageCode = "de") {
     const k = apiKey.trim();
     if (!k) {
       alert("Paste your ElevenLabs API key first.");
@@ -246,8 +257,9 @@ export default function StudyPage() {
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`;
     const body = {
       text,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: { stability: 0.35, similarity_boost: 0.85, speed: Number(speed) || 1.0 },
+      model_id: ELEVENLABS_MODEL_ID,
+      language_code: languageCode,
+      voice_settings: V3_VOICE_SETTINGS,
     };
 
     const res = await fetch(url, {
@@ -275,6 +287,7 @@ export default function StudyPage() {
 
   function playAudioElement(a, onEnd, onTick) {
     return new Promise((resolve) => {
+      a.playbackRate = Math.min(1.2, Math.max(0.7, Number(speed) || 1.0));
       currentAudioRef.current = a;
 
       const ended = () => {
@@ -332,7 +345,7 @@ export default function StudyPage() {
   async function playEnglishLine(text) {
     stopAudioOnly();
     clearPlaybackHighlightsOnly();
-    const blob = await ttsStream(text);
+    const blob = await ttsStream(text, "en");
     if (!blob) return;
     await playAudioBlob(blob, null);
   }
@@ -987,8 +1000,23 @@ li.row{
       <style>{styles}</style>
 
       <h2>German Study (ElevenLabs)</h2>
-        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
         <Link to="/learning"><button>Learning Words (Big View)</button></Link>
+        <Link to="/recording-focus"><button>Recording Focus</button></Link>
+        <label htmlFor="study-phrase-list">Phrase list:</label>
+        <select
+          id="study-phrase-list"
+          value={phraseListUrl}
+          onChange={(e) => {
+            stopAll();
+            setPhraseListUrl(e.target.value);
+          }}
+        >
+          {PHRASE_LISTS.map((list) => (
+            <option key={list.value} value={list.value}>{list.label}</option>
+          ))}
+        </select>
+        <small>Model: {ELEVENLABS_MODEL_NAME} • German language override</small>
         </div>
       <label>ElevenLabs API Key:</label>
       <input
@@ -1004,7 +1032,7 @@ li.row{
           <select value={voiceId} onChange={(e) => setVoiceId(e.target.value)}>
             {voices.map((v) => (
               <option key={v.voice_id} value={v.voice_id}>
-                {v.name || v.voice_id}
+                {formatVoiceLabel(v)}
               </option>
             ))}
           </select>
@@ -1018,7 +1046,7 @@ li.row{
       <div className="grid3">
         <div className="rowC">
           <label>
-            Speed: <b>{speed.toFixed(2)}x</b>
+            Playback speed: <b>{speed.toFixed(2)}x</b>
           </label>
           <input
             type="range"

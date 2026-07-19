@@ -288,3 +288,9 @@ input[type="password"], select, input[type="number"] {
   .right{ position: static; height: auto; }
   .bigCard{ min-height: 240px; }
 }
+
+.recordedSpeaking{
+  text-shadow: 0 0 28px rgba(34, 197, 94, 0.72);
+  transform: scale(1.04);
+  transition: transform 120ms ease, text-shadow 120ms ease;
+}

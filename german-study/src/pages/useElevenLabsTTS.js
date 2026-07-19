@@ -1,11 +1,17 @@
 import { useRef, useState } from "react";
-
-const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM";
+import {
+  countGermanVoices,
+  DEFAULT_VOICE,
+  DEFAULT_VOICE_ID,
+  ELEVENLABS_MODEL_ID,
+  sortVoicesForGerman,
+  V3_VOICE_SETTINGS,
+} from "./elevenLabsConfig";
 
 export function useElevenLabsTTS() {
   const [apiKey, setApiKey] = useState(import.meta.env.VITE_ELEVENLABS_API_KEY || "");
-  const [voices, setVoices] = useState([{ voice_id: DEFAULT_VOICE, name: "Default" }]);
-  const [voiceId, setVoiceId] = useState(DEFAULT_VOICE);
+  const [voices, setVoices] = useState([DEFAULT_VOICE]);
+  const [voiceId, setVoiceId] = useState(DEFAULT_VOICE_ID);
   const [voiceStatus, setVoiceStatus] = useState("");
 
   const currentAudioRef = useRef(null);
@@ -16,7 +22,9 @@ export function useElevenLabsTTS() {
       try {
         a.pause();
         a.currentTime = 0;
-      } catch {}
+      } catch {
+        // Audio may already be unavailable while the component is unmounting.
+      }
       currentAudioRef.current = null;
     }
   }
@@ -27,7 +35,7 @@ export function useElevenLabsTTS() {
 
     setVoiceStatus("Loading…");
     try {
-      const res = await fetch("https://api.elevenlabs.io/v1/voices", {
+      const res = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100", {
         method: "GET",
         headers: { "xi-api-key": k },
       });
@@ -37,20 +45,20 @@ export function useElevenLabsTTS() {
       }
 
       const data = await res.json();
-      const list = data.voices || [];
-      setVoices(list.length ? list : [{ voice_id: DEFAULT_VOICE, name: "Default" }]);
+      const list = sortVoicesForGerman(data.voices || []);
+      setVoices(list.length ? list : [DEFAULT_VOICE]);
 
       const keep = list.some((v) => v.voice_id === voiceId);
-      setVoiceId(keep ? voiceId : list[0]?.voice_id || DEFAULT_VOICE);
+      setVoiceId(keep ? voiceId : list[0]?.voice_id || DEFAULT_VOICE_ID);
 
-      setVoiceStatus(`Loaded ${list.length} voice(s).`);
+      setVoiceStatus(`Loaded ${list.length} voices • German: ${countGermanVoices(list)}`);
     } catch (e) {
       setVoiceStatus("");
       alert("Failed to load voices: " + e.message);
     }
   }
 
-  async function ttsStream(text, { speed = 1.0, languageCode = "de" } = {}) {
+  async function ttsStream(text, { languageCode = "de" } = {}) {
     const k = apiKey.trim();
     if (!k) {
       alert("Paste your ElevenLabs API key first.");
@@ -60,9 +68,9 @@ export function useElevenLabsTTS() {
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`;
     const body = {
       text,
-      model_id: "eleven_multilingual_v2",
-      language_code: languageCode, // ✅ FORCE German
-      voice_settings: { stability: 0.35, similarity_boost: 0.85, speed: Number(speed) || 1.0 },
+      model_id: ELEVENLABS_MODEL_ID,
+      language_code: languageCode,
+      voice_settings: V3_VOICE_SETTINGS,
     };
 
     const res = await fetch(url, {
@@ -80,9 +88,10 @@ export function useElevenLabsTTS() {
     return await res.blob();
   }
 
-  function playAudioBlob(blob) {
+  function playAudioBlob(blob, speed = 1.0) {
     const url = URL.createObjectURL(blob);
     const a = new Audio(url);
+    a.playbackRate = Math.min(1.2, Math.max(0.7, Number(speed) || 1.0));
     currentAudioRef.current = a;
 
     return new Promise((resolve) => {
@@ -97,9 +106,9 @@ export function useElevenLabsTTS() {
 
   async function playText(text, { speed = 1.0, languageCode = "de" } = {}) {
     stopAudioOnly();
-    const blob = await ttsStream(text, { speed, languageCode });
+    const blob = await ttsStream(text, { languageCode });
     if (!blob) return;
-    await playAudioBlob(blob);
+    await playAudioBlob(blob, speed);
   }
 
   function togglePauseAudio(isPaused) {

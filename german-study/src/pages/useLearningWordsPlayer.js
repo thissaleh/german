@@ -4,23 +4,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { usePlaylistRunner } from "./usePlaylistRunner";
 import { parseGermanStudyText } from "./parsers"; // adjust path
 
-
-function parseOverrides(text) {
-  const map = new Map();
-  const lines = (text || "").split("\n");
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const idx = line.indexOf("=");
-    if (idx <= 0) continue;
-    const k = line.slice(0, idx).trim().toLowerCase();
-    const v = line.slice(idx + 1).trim();
-    if (k && v) map.set(k, v);
-  }
-  return map;
-}
-
-export function useLearningWordsPlayer({ contentUrl = "/basics_01.txt" } = {}) {
+export function useLearningWordsPlayer({ contentUrl = "/german_phrases_01.txt" } = {}) {
   // settings
   const [speed, setSpeed] = useState(1.0);
   const [delaySec, setDelaySec] = useState(0.75);
@@ -36,15 +20,6 @@ export function useLearningWordsPlayer({ contentUrl = "/basics_01.txt" } = {}) {
 
   const [focusMode, setFocusMode] = useState(false);
   const [focusAnimKey, setFocusAnimKey] = useState(0);
-
-  // pronunciation overrides (editable)
-  const [pronOverridesText, setPronOverridesText] = useState(
-    "# Add overrides for tricky words (format: word=alias)\n" +
-      "ich=ikh\n" +
-      "sie=zee\n" +
-      "für=fyur\n"
-  );
-  const overridesMap = useMemo(() => parseOverrides(pronOverridesText), [pronOverridesText]);
 
   // content
   const [content, setContent] = useState("");
@@ -69,19 +44,6 @@ export function useLearningWordsPlayer({ contentUrl = "/basics_01.txt" } = {}) {
     };
   }, [contentUrl]);
 
-  // parse playlist
-  function parseWordsOnly(text) {
-    const headerRe = /^(\d+)\.\s*(.+?)\s*[–—-]\s*(.+)$/;
-    const lines = (text || "").split("\n").map((x) => x.trim()).filter(Boolean);
-
-    const items = [];
-    for (const line of lines) {
-      const m = line.match(headerRe);
-      if (m) items.push({ num: m[1], word: m[2], meaning: m[3] });
-    }
-    return items;
-  }
-
 const playlist = useMemo(() => {
   const items = parseGermanStudyText(content);
 
@@ -96,27 +58,13 @@ const playlist = useMemo(() => {
 
   const delayMs = useMemo(() => Math.max(0, Number(delaySec) || 0) * 1000, [delaySec]);
 
-  // ✅ Removed "Deutsch:" completely (no prefix)
-  function applyGermanPrefix(text, { isFocus } = {}) {
-    return text;
-  }
-
-  function aliasForWord(word) {
-    const k = (word || "").trim().toLowerCase();
-    return overridesMap.get(k) || null;
-  }
-
   // play one item:
-  // - German word: languageCode=de + override alias (EVERYWHERE)
+  // - German word: Eleven v3 with German language override
   // - English meaning (if enabled): languageCode=en
-  async function playOne(item, idx, { isFocus = false } = {}) {
+  async function playOne(item) {
     setFocusAnimKey((x) => x + 1);
 
-    const originalWord = item.word || "";
-    const alias = aliasForWord(originalWord);
-    const spokenWord = alias || originalWord;
-
-    await tts.playText(applyGermanPrefix(spokenWord, { isFocus }), { speed, languageCode: "de" });
+    await tts.playText(item.word || "", { speed, languageCode: "de" });
     if (runner.shouldStopRef.current) return;
 
     if (speakEnglish && item.meaning) {
@@ -221,10 +169,6 @@ const playlist = useMemo(() => {
     setFocusRepeatWord,
     focusRepeatList,
     setFocusRepeatList,
-
-    // pronunciation overrides
-    pronOverridesText,
-    setPronOverridesText,
 
     // state
     nowText: runner.nowText,
