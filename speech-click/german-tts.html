@@ -1,0 +1,917 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>German Study (ElevenLabs)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; }
+    textarea { width: 100%; height: 260px; }
+    button { padding: 10px 14px; margin: 8px 8px 8px 0; }
+    ul { list-style: none; padding: 0; }
+
+    small { color: #666; }
+    input[type="text"], input[type="password"], select {
+      width:100%; padding:10px; margin:6px 0 10px; box-sizing: border-box;
+    }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 170px; gap: 10px; align-items: end; }
+    .grid3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
+    .rowC { margin: 10px 0; }
+    .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin: 10px 0; }
+    .controls label { display:flex; gap:8px; align-items:center; padding:8px 10px; border:1px solid #e6e6e6; border-radius:12px; }
+    .controls select, .controls input[type="number"] { width:auto; margin:0; padding:8px 10px; }
+
+    .itemHead{
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      margin: 16px 0 10px;
+      background: #f7f7f7;
+      cursor: pointer;
+      user-select: none;
+    }
+    .itemHead:hover{ background:#f1f1f1; }
+    .itemHead .title{ font-weight: 800; font-size: 16px; }
+
+    li.row {
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      margin: 10px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    li.row:hover { background: #fafafa; }
+
+    /* Highlights */
+    .itemHead.now { outline: 2px solid #86efac; background: #bbf7d0; } /* green header */
+    li.row.now { outline: 2px solid #f59e0b; background: #fff7ed; }   /* orange row */
+
+    .sentenceText { margin-top: 2px; line-height: 1.9; }
+    .tok {
+      display: inline-block;
+      padding: 2px 4px;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      margin: 1px 0;
+    }
+    .tok:hover { background: #f2f2f2; }
+    .tok.punct { opacity: 0.55; cursor: default; }
+    .tok.playing { background: #bbf7d0; } /* green speaking word */
+
+    .words { margin-top: 10px; line-height: 2.2; }
+    .w {
+      display: inline-block;
+      padding: 4px 8px;
+      margin: 4px 4px 0 0;
+      border: 1px solid #e3e3e3;
+      border-radius: 999px;
+      cursor: pointer;
+      user-select: none;
+      background: #fff;
+      font-size: 14px;
+    }
+    .w:hover { background: #f6f6f6; }
+    .w.playing { background: #bbf7d0; border-color:#86efac; } /* chip highlight only on chip click */
+
+    .en {
+      margin-top: 8px;
+      color: #444;
+      font-size: 14px;
+      padding-top: 8px;
+      border-top: 1px dashed #e5e5e5;
+      cursor: default;
+    }
+
+    .status {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      background: #fbfbfb;
+      color: #444;
+      display:flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .status b { color:#111; }
+
+    /* Learning Words Mode: row highlight = green */
+body.learning-words li.row.now{
+  outline: 2px solid #86efac !important;
+  background: #bbf7d0 !important;
+}
+
+
+  </style>
+</head>
+<body>
+  <h2>German Study (ElevenLabs)</h2>
+  <p><small>
+    Normal mode: header + sentences + chips + English.<br/>
+    NEW: “Learning words” shows only: <b>1. Ich – I</b>, <b>2. Sein – To be</b>, <b>3. Sie – She/They</b> and plays the German word.
+  </small></p>
+
+  <label>ElevenLabs API Key:</label>
+  <input id="key" type="password" placeholder="paste your ElevenLabs API key here" />
+
+  <div class="grid2">
+    <div>
+      <label>Voice:</label>
+      <select id="voiceSelect">
+        <option value="21m00Tcm4TlvDq8ikWAM">Default</option>
+      </select>
+      <small id="voiceStatus"></small>
+    </div>
+    <div>
+      <button onclick="loadVoices()">Load voices</button>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="rowC">
+      <label>Speed: <b><span id="speedVal">1.00</span>x</b></label>
+      <input id="speed" type="range" min="0.70" max="1.20" step="0.05" value="1.00" style="width:100%;">
+    </div>
+
+    <div class="rowC">
+      <label>Delay (seconds) between lines:</label>
+      <input id="delaySec" type="number" min="0" step="0.25" value="0.75" />
+    </div>
+
+    <div class="rowC">
+      <label>Loop mode:</label>
+      <select id="loopMode">
+        <option value="none">No loop</option>
+        <option value="all">Loop all</option>
+        <option value="one">Repeat current</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button onclick="playAll()">Play All</button>
+    <button id="btnPause" onclick="togglePause()">Pause</button>
+    <button onclick="stopAll()">Stop</button>
+    <button onclick="prevItem()">Prev</button>
+    <button onclick="nextItem()">Next</button>
+
+    <label><input id="speakEnglish" type="checkbox" checked> Speak English too</label>
+    <label><input id="autoScroll" type="checkbox" checked> Auto-scroll</label>
+    <label><input id="repeatClickMode" type="checkbox"> Repeat clicked item</label>
+    <label><input id="learningWordsMode" type="checkbox" onchange="build()"> Learning words</label>
+  </div>
+
+  <div class="status">
+    <div>Now: <b id="nowText">—</b></div>
+    <div>Index: <b id="idxText">—</b></div>
+  </div>
+
+  <label>Input format (German line then English line):</label>
+  <textarea id="content">1. Ich – I
+Mein Name ist Joachim und ich komme aus Berlin.
+My name is Joachim and I come from Berlin.
+
+2. Sein – To be
+Es ist nicht immer einfach, vernünftig zu sein.
+It’s not always easy to be sensible.
+
+3. Sie – She/They
+Heute möchte sie ihre Familie in Hamburg besuchen.
+Today she wants to visit her family in Hamburg.</textarea>
+
+  <div>
+    <button onclick="build()">Build</button>
+  </div>
+
+  <ul id="list"></ul>
+
+  <script>
+    // =========================
+    // State
+    // =========================
+    let currentAudio = null;
+    let rafId = null;
+
+    // playlist items:
+    // type="sentence": {type,de,en,rowEl,tokEls,headerEl}
+    // type="word": {type,word,meaning,rowEl,labelText}
+    let playlist = [];
+    let currentIndex = -1;
+    let isRunning = false;
+    let isPaused = false;
+    let shouldStop = false;
+
+    // Repeat-click mode state (works for word OR sentence rows)
+    let repeatActive = false;
+    let repeatKey = null;
+
+    // =========================
+    // UI helpers
+    // =========================
+    const speedEl = document.getElementById("speed");
+    const speedValEl = document.getElementById("speedVal");
+    speedEl.addEventListener("input", () => {
+      speedValEl.textContent = Number(speedEl.value).toFixed(2);
+    });
+
+    function getVoiceId() {
+      const sel = document.getElementById("voiceSelect");
+      return (sel && sel.value) ? sel.value : "21m00Tcm4TlvDq8ikWAM";
+    }
+
+    function delayMs() {
+      const s = parseFloat(document.getElementById("delaySec").value || "0");
+      return Math.max(0, s) * 1000;
+    }
+
+    function setStatus(text, idx) {
+      document.getElementById("nowText").textContent = text || "—";
+      document.getElementById("idxText").textContent = (idx >= 0) ? `${idx+1}/${playlist.length}` : "—";
+    }
+
+    function clearAllHighlights() {
+      document.querySelectorAll(".tok.playing").forEach(el => el.classList.remove("playing"));
+      document.querySelectorAll(".w.playing").forEach(el => el.classList.remove("playing"));
+      document.querySelectorAll("li.row.now").forEach(el => el.classList.remove("now"));
+      document.querySelectorAll(".itemHead.now").forEach(el => el.classList.remove("now"));
+    }
+
+    // IMPORTANT: keep row/header highlight when clicking words/chips
+    function clearPlaybackHighlightsOnly() {
+      document.querySelectorAll(".tok.playing").forEach(el => el.classList.remove("playing"));
+      document.querySelectorAll(".w.playing").forEach(el => el.classList.remove("playing"));
+    }
+
+    function stopAudioOnly() {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+      }
+    }
+
+    function stopAll() {
+      shouldStop = true;
+      isRunning = false;
+      isPaused = false;
+      document.getElementById("btnPause").textContent = "Pause";
+
+      repeatActive = false;
+      repeatKey = null;
+
+      stopAudioOnly();
+      clearAllHighlights();
+      setStatus("—", -1);
+    }
+
+    function highlightHeader(headerEl) {
+      document.querySelectorAll(".itemHead.now").forEach(el => el.classList.remove("now"));
+      if (headerEl) headerEl.classList.add("now");
+      if (headerEl && document.getElementById("autoScroll").checked) {
+        headerEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+
+    function highlightRow(rowEl) {
+      document.querySelectorAll("li.row.now").forEach(el => el.classList.remove("now"));
+      if (rowEl) rowEl.classList.add("now");
+      if (rowEl && document.getElementById("autoScroll").checked) {
+        rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+
+    // =========================
+    // ElevenLabs: load voices
+    // =========================
+    async function loadVoices() {
+      const apiKey = document.getElementById("key").value.trim();
+      const status = document.getElementById("voiceStatus");
+      const sel = document.getElementById("voiceSelect");
+      status.textContent = "";
+      if (!apiKey) { alert("Paste your ElevenLabs API key first."); return; }
+      status.textContent = "Loading…";
+
+      try {
+        const res = await fetch("https://api.elevenlabs.io/v1/voices", {
+          method: "GET",
+          headers: { "xi-api-key": apiKey }
+        });
+        if (!res.ok) {
+          const msg = await res.text().catch(() => "");
+          throw new Error(res.status + " " + msg);
+        }
+        const data = await res.json();
+        const voices = data.voices || [];
+        const prev = sel.value;
+
+        sel.innerHTML = "";
+        for (const v of voices) {
+          const opt = document.createElement("option");
+          opt.value = v.voice_id;
+          opt.textContent = v.name ? v.name : v.voice_id;
+          sel.appendChild(opt);
+        }
+        if (!voices.length) {
+          const opt = document.createElement("option");
+          opt.value = "21m00Tcm4TlvDq8ikWAM";
+          opt.textContent = "Default";
+          sel.appendChild(opt);
+        }
+
+        const found = Array.from(sel.options).some(o => o.value === prev);
+        sel.value = found ? prev : sel.options[0].value;
+        status.textContent = `Loaded ${voices.length} voice(s).`;
+      } catch (e) {
+        status.textContent = "";
+        alert("Failed to load voices: " + e.message);
+      }
+    }
+
+    // =========================
+    // Tokenization helpers
+    // =========================
+    function tokenize(text) {
+      const re = /[A-Za-zÄÖÜäöüß0-9]+|[^\s]/g;
+      return (text.match(re) || []);
+    }
+    function isPunct(tok) { return /^[^\wÄÖÜäöüß0-9]+$/.test(tok); }
+
+    function wordSpans(sentence) {
+      const spans = [];
+      const re = /[A-Za-zÄÖÜäöüß0-9]+/g;
+      let m;
+      while ((m = re.exec(sentence)) !== null) {
+        spans.push({ start: m.index, end: m.index + m[0].length });
+      }
+      return spans;
+    }
+
+    function base64ToBlobUrl(base64, mime="audio/mpeg") {
+      const binStr = atob(base64);
+      const len = binStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mime });
+      return URL.createObjectURL(blob);
+    }
+
+    // =========================
+    // TTS calls
+    // =========================
+    async function ttsStream(text) {
+      // const apiKey = document.getElementById("key").value.trim();
+      const apiKey = "xxx";
+
+      if (!apiKey) { alert("Paste your ElevenLabs API key first."); return null; }
+      const voiceId = getVoiceId();
+      const speed = parseFloat(document.getElementById("speed").value || "1.0");
+
+      const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`;
+      const body = { text, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.35, similarity_boost: 0.85, speed } };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "xi-api-key": apiKey, "Content-Type": "application/json", "Accept": "audio/mpeg" },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        alert("TTS failed: " + res.status + " " + msg);
+        return null;
+      }
+      return await res.blob();
+    }
+
+    async function ttsWithTimestamps(text) {
+      const apiKey = document.getElementById("key").value.trim();
+      if (!apiKey) { alert("Paste your ElevenLabs API key first."); return null; }
+      const voiceId = getVoiceId();
+      const speed = parseFloat(document.getElementById("speed").value || "1.0");
+
+      const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`;
+      const body = { text, model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.35, similarity_boost: 0.85, speed } };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "xi-api-key": apiKey, "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        alert("TTS failed: " + res.status + " " + msg);
+        return null;
+      }
+      return await res.json();
+    }
+
+    // =========================
+    // Playback primitives
+    // =========================
+    function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function waitForResume() {
+      return new Promise(resolve => {
+        const t = setInterval(() => {
+          if (!isPaused) { clearInterval(t); resolve(); }
+        }, 100);
+      });
+    }
+
+    function playAudioBlob(blob, onEnd) {
+      const url = URL.createObjectURL(blob);
+      const a = new Audio(url);
+      return playAudioElement(a, onEnd);
+    }
+
+    function playAudioElement(a, onEnd, onTick) {
+      return new Promise(resolve => {
+        currentAudio = a;
+
+        const ended = () => {
+          a.removeEventListener("ended", ended);
+          a.removeEventListener("pause", pausedListener);
+          if (onEnd) onEnd();
+          resolve();
+        };
+
+        const pausedListener = async () => {
+          if (isPaused) {
+            await waitForResume();
+            try { a.play(); } catch {}
+          }
+        };
+
+        a.addEventListener("ended", ended);
+        a.addEventListener("pause", pausedListener);
+
+        if (onTick) {
+          a.addEventListener("play", () => { rafId = requestAnimationFrame(onTick); }, { once:true });
+        }
+
+        a.play().catch(() => resolve());
+      });
+    }
+
+    // =========================
+    // Play actions
+    // =========================
+    async function playWordQuick(text, chipEl=null, tokEl=null) {
+      stopAudioOnly();
+      clearPlaybackHighlightsOnly();
+
+      if (chipEl) chipEl.classList.add("playing");
+      if (tokEl) tokEl.classList.add("playing");
+
+      const blob = await ttsStream(text);
+      if (!blob) return;
+
+      await playAudioBlob(blob, () => {
+        if (chipEl) chipEl.classList.remove("playing");
+        if (tokEl) tokEl.classList.remove("playing");
+      });
+    }
+
+    async function playEnglishLine(text) {
+      stopAudioOnly();
+      clearPlaybackHighlightsOnly();
+      const blob = await ttsStream(text);
+      if (!blob) return;
+      await playAudioBlob(blob, null);
+    }
+
+    async function playGermanSentenceWithHighlight(sentence, tokEls) {
+      stopAudioOnly();
+      document.querySelectorAll(".tok.playing").forEach(el => el.classList.remove("playing"));
+
+      const data = await ttsWithTimestamps(sentence);
+      if (!data) return;
+
+      const audioUrl = base64ToBlobUrl(data.audio_base64);
+      const align = data.alignment || {};
+      const starts = align.character_start_times_seconds || [];
+      const ends = align.character_end_times_seconds || [];
+
+      const spans = wordSpans(sentence);
+      const wordTimings = spans.map((s, i) => {
+        const startT = starts[s.start] ?? 0;
+        const endT = ends[Math.max(s.end - 1, s.start)] ?? (startT + 0.2);
+        return { i, startT, endT };
+      });
+
+      currentAudio = new Audio(audioUrl);
+
+      let lastIdx = -1;
+      function tick() {
+        if (!currentAudio) return;
+        const t = currentAudio.currentTime;
+
+        let idx = -1;
+        for (let k = 0; k < wordTimings.length; k++) {
+          if (t >= wordTimings[k].startT && t < wordTimings[k].endT) { idx = wordTimings[k].i; break; }
+        }
+
+        if (idx !== lastIdx) {
+          document.querySelectorAll(".tok.playing").forEach(el => el.classList.remove("playing"));
+          if (idx >= 0 && tokEls[idx]) tokEls[idx].classList.add("playing");
+          lastIdx = idx;
+        }
+        rafId = requestAnimationFrame(tick);
+      }
+
+      await playAudioElement(currentAudio, () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        document.querySelectorAll(".tok.playing").forEach(el => el.classList.remove("playing"));
+      }, tick);
+    }
+
+    // =========================
+    // Repeat clicked item mode (word OR sentence)
+    // =========================
+    async function toggleRepeatItem(item) {
+      const key = item.rowEl.dataset.key;
+
+      if (repeatActive && repeatKey === key) {
+        repeatActive = false;
+        repeatKey = null;
+        stopAudioOnly();
+        clearPlaybackHighlightsOnly();
+        setStatus("—", -1);
+        return;
+      }
+
+      // stop everything else and start repeating
+      stopAll();
+      shouldStop = false;
+      isRunning = false;
+      isPaused = false;
+
+      repeatActive = true;
+      repeatKey = key;
+
+      while (repeatActive && repeatKey === key && !shouldStop) {
+        highlightRow(item.rowEl);
+        if (item.headerEl) highlightHeader(item.headerEl);
+
+        if (item.type === "word") {
+          setStatus("Repeating: " + item.word, -1);
+          if (isPaused) await waitForResume();
+          if (!repeatActive || repeatKey !== key || shouldStop) break;
+
+          await playWordQuick(item.word);
+          if (!repeatActive || repeatKey !== key || shouldStop) break;
+
+          await wait(delayMs());
+        } else {
+          setStatus("Repeating: " + item.de, -1);
+          if (isPaused) await waitForResume();
+          if (!repeatActive || repeatKey !== key || shouldStop) break;
+
+          await playGermanSentenceWithHighlight(item.de, item.tokEls);
+          if (!repeatActive || repeatKey !== key || shouldStop) break;
+
+          await wait(delayMs());
+        }
+      }
+    }
+
+    // =========================
+    // Build DOM (Normal mode)
+    // =========================
+    function addSentenceTokens(container, sentence) {
+      const tokens = tokenize(sentence);
+      const wordTokEls = [];
+
+      for (let i = 0; i < tokens.length; i++) {
+        const tok = tokens[i];
+        const next = tokens[i + 1];
+
+        const span = document.createElement("span");
+        span.className = "tok" + (isPunct(tok) ? " punct" : "");
+        span.textContent = tok;
+
+        if (!isPunct(tok)) {
+          span.onclick = (ev) => { ev.stopPropagation(); playWordQuick(tok, null, span); };
+          wordTokEls.push(span);
+        } else {
+          span.onclick = (ev) => ev.stopPropagation();
+        }
+
+        container.appendChild(span);
+
+        if (!isPunct(tok) && next && !isPunct(next)) container.appendChild(document.createTextNode(" "));
+        else if (isPunct(tok) && next && !isPunct(next)) container.appendChild(document.createTextNode(" "));
+      }
+      return wordTokEls;
+    }
+
+    function buildChips(container, sentence) {
+      container.innerHTML = "";
+      const tokens = tokenize(sentence).filter(t => !isPunct(t));
+      for (const tok of tokens) {
+        const chip = document.createElement("span");
+        chip.className = "w";
+        chip.textContent = tok;
+        chip.onclick = (ev) => { ev.stopPropagation(); playWordQuick(tok, chip, null); };
+        container.appendChild(chip);
+      }
+    }
+
+    function parseContent(text) {
+      const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+      const items = [];
+
+      for (const b of blocks) {
+        const lines = b.split("\n").map(x => x.trim()).filter(Boolean);
+        if (!lines.length) continue;
+
+        const m = lines[0].match(/^(\d+)\.\s*(.+?)\s*[–-]\s*(.+)$/);
+        if (!m) continue;
+
+        const num = m[1], word = m[2], meaning = m[3];
+
+        const examples = [];
+        let i = 1;
+        while (i + 1 < lines.length) {
+          examples.push({ de: lines[i], en: lines[i+1] });
+          i += 2;
+        }
+        items.push({ num, word, meaning, examples });
+      }
+      return items;
+    }
+
+    // =========================
+    // Build DOM (Learning words mode)
+    // =========================
+    function buildLearningWords(items, ul) {
+      // Only show word list: "1. Ich – I" etc. as li.row
+      let rowKeyCounter = 0;
+      for (const it of items) {
+        const li = document.createElement("li");
+        li.className = "row";
+        li.dataset.key = "wrow_" + (++rowKeyCounter);
+        li.textContent = `${it.num}. ${it.word} – ${it.meaning}`;
+        ul.appendChild(li);
+
+        const wordItem = {
+          type: "word",
+          word: it.word,
+          meaning: it.meaning,
+          rowEl: li
+        };
+        playlist.push(wordItem);
+
+        li.onclick = async () => {
+          const repeatMode = document.getElementById("repeatClickMode").checked;
+
+          if (repeatMode) {
+            await toggleRepeatItem(wordItem);
+            return;
+          }
+
+          stopAll();
+          shouldStop = false;
+          highlightRow(li);
+          setStatus(it.word, -1);
+
+          await playWordQuick(it.word);
+          if (shouldStop) return;
+
+          await wait(delayMs());
+          if (shouldStop) return;
+
+          if (document.getElementById("speakEnglish").checked && it.meaning) {
+            await playEnglishLine(it.meaning);
+            if (shouldStop) return;
+            await wait(delayMs());
+          }
+        };
+      }
+    }
+
+    // =========================
+    // Build main
+    // =========================
+    function build() {
+      stopAll();
+      const ul = document.getElementById("list");
+      ul.innerHTML = "";
+      playlist = [];
+      currentIndex = -1;
+
+      const items = parseContent(document.getElementById("content").value);
+      const learningWords = document.getElementById("learningWordsMode").checked;
+      document.body.classList.toggle("learning-words", learningWords);
+
+
+      if (learningWords) {
+        buildLearningWords(items, ul);
+        setStatus("—", -1);
+        return;
+      }
+
+      // Normal mode (headers + sentences)
+      let rowKeyCounter = 0;
+
+      for (const it of items) {
+        const head = document.createElement("div");
+        head.className = "itemHead";
+        head.innerHTML = `<div class="title">${it.num}. ${it.word} – ${it.meaning}</div>`;
+        ul.appendChild(head);
+
+        head.onclick = async () => {
+          stopAll();
+          shouldStop = false;
+          highlightHeader(head);
+          setStatus(it.word, -1);
+
+          await playWordQuick(it.word);
+          if (shouldStop) return;
+
+          await wait(delayMs());
+          if (shouldStop) return;
+
+          if (document.getElementById("speakEnglish").checked && it.meaning) {
+            await playEnglishLine(it.meaning);
+          }
+        };
+
+        for (const ex of it.examples) {
+          const li = document.createElement("li");
+          li.className = "row";
+          li.dataset.key = "srow_" + (++rowKeyCounter);
+
+          const sentenceText = document.createElement("div");
+          sentenceText.className = "sentenceText";
+          const tokEls = addSentenceTokens(sentenceText, ex.de);
+
+          const chips = document.createElement("div");
+          chips.className = "words";
+          buildChips(chips, ex.de);
+
+          const en = document.createElement("div");
+          en.className = "en";
+          en.textContent = ex.en;
+          en.onclick = (ev) => ev.stopPropagation();
+
+          li.appendChild(sentenceText);
+          li.appendChild(chips);
+          li.appendChild(en);
+          ul.appendChild(li);
+
+          const itemObj = { type:"sentence", de: ex.de, en: ex.en, rowEl: li, tokEls, headerEl: head };
+          playlist.push(itemObj);
+
+          li.onclick = async () => {
+            const repeatMode = document.getElementById("repeatClickMode").checked;
+
+            if (repeatMode) {
+              await toggleRepeatItem(itemObj);
+              return;
+            }
+
+            stopAll();
+            shouldStop = false;
+
+            highlightHeader(head);
+            highlightRow(li);
+            setStatus(ex.de, -1);
+
+            await playGermanSentenceWithHighlight(ex.de, tokEls);
+            if (shouldStop) return;
+
+            await wait(delayMs());
+            if (shouldStop) return;
+
+            if (document.getElementById("speakEnglish").checked && ex.en) {
+              await playEnglishLine(ex.en);
+              if (shouldStop) return;
+              await wait(delayMs());
+            }
+          };
+        }
+      }
+
+      setStatus("—", -1);
+    }
+
+    // =========================
+    // Playlist play
+    // =========================
+    async function playSingleExample(item, idx) {
+      highlightRow(item.rowEl);
+      if (item.headerEl) highlightHeader(item.headerEl);
+
+      if (item.type === "word") {
+        setStatus(item.word, idx);
+
+        await playWordQuick(item.word);
+        if (shouldStop) return;
+
+        await wait(delayMs());
+        if (shouldStop) return;
+
+        if (document.getElementById("speakEnglish").checked && item.meaning) {
+          await playEnglishLine(item.meaning);
+          if (shouldStop) return;
+          await wait(delayMs());
+        }
+        return;
+      }
+
+      setStatus(item.de, idx);
+
+      await playGermanSentenceWithHighlight(item.de, item.tokEls);
+      if (shouldStop) return;
+
+      await wait(delayMs());
+      if (shouldStop) return;
+
+      if (document.getElementById("speakEnglish").checked && item.en) {
+        await playEnglishLine(item.en);
+        if (shouldStop) return;
+        await wait(delayMs());
+      }
+    }
+
+    async function playAll(startAt = 0) {
+      if (!playlist.length) { alert("Click Build first."); return; }
+
+      // stop repeat mode if active
+      repeatActive = false;
+      repeatKey = null;
+
+      shouldStop = false;
+      isRunning = true;
+      isPaused = false;
+      document.getElementById("btnPause").textContent = "Pause";
+
+      if (currentIndex < 0) currentIndex = startAt;
+
+      while (!shouldStop && isRunning) {
+        const loopMode = document.getElementById("loopMode").value;
+
+        if (currentIndex < 0) currentIndex = 0;
+        if (currentIndex >= playlist.length) {
+          if (loopMode === "all") currentIndex = 0;
+          else break;
+        }
+
+        if (isPaused) await waitForResume();
+        if (shouldStop) break;
+
+        await playSingleExample(playlist[currentIndex], currentIndex);
+        if (shouldStop) break;
+
+        if (loopMode === "one") {
+          // keep same
+        } else {
+          currentIndex++;
+        }
+      }
+
+      isRunning = false;
+      if (!shouldStop) {
+        clearAllHighlights();
+        setStatus("Finished", -1);
+      }
+    }
+
+    function togglePause() {
+      isPaused = !isPaused;
+      document.getElementById("btnPause").textContent = isPaused ? "Resume" : "Pause";
+      if (currentAudio) {
+        if (isPaused) currentAudio.pause();
+        else currentAudio.play().catch(() => {});
+      }
+    }
+
+    function nextItem() {
+      if (!playlist.length) return;
+      stopAll();
+      currentIndex = Math.min(playlist.length - 1, (currentIndex < 0 ? 0 : currentIndex + 1));
+      playlist[currentIndex].rowEl.click();
+    }
+
+    function prevItem() {
+      if (!playlist.length) return;
+      stopAll();
+      currentIndex = Math.max(0, (currentIndex <= 0 ? 0 : currentIndex - 1));
+      playlist[currentIndex].rowEl.click();
+    }
+
+    // =========================
+    // Init
+    // =========================
+    build();
+  </script>
+</body>
+</html>

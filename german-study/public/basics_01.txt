@@ -1,0 +1,119 @@
+1. Ich mag dich.
+   I like you.
+
+2. Ich weiß nicht.
+   I don’t know.
+
+3. Wie geht’s?
+   How are you?
+
+4. Ich muss gehen.
+   I need to go.
+
+5. Ich treffe dich dort.
+   I will meet you there.
+
+6. Ich habe es geändert.
+   I have changed it.
+
+7. Ich weiß.
+   I know.
+
+8. Wann hat es angefangen?
+   When did it start?
+
+9. Ich heiße Saleh.
+   My name is Saleh.
+
+10. Ja.
+    Yes.
+
+11. Nein.
+    No.
+
+12. Danke.
+    Thank you.
+
+13. Danke.
+    Thanks.
+
+14. Tschüss.
+    Bye.
+
+15. Auf Wiedersehen.
+    Goodbye.
+
+16. Guten Morgen.
+    Good morning.
+
+17. Guten Abend.
+    Good evening.
+
+18. Gute Nacht.
+    Good night.
+
+19. Guten Tag.
+    Good day.
+
+20. Schönes Wochenende!
+    Have a nice weekend!
+
+21. Bis bald!
+    See you.
+
+22. Bis später.
+    Talk to you later.
+
+23. Dir auch!
+    You too.
+
+24. Super!
+    Great!
+
+25. Schön!
+    Nice!
+
+26. Klingt gut.
+    Sounds good.
+
+27. Ich komme aus dem Jemen.
+    I am from Yemen.
+
+28. Ich wohne in Berlin.
+    I live in Berlin.
+
+29. Wie viel kostet das?
+    How much is this/that?
+
+30. Wie viel kostet es?
+    How much is it?
+
+31. Ich möchte bar bezahlen.
+    I want to pay by cash.
+
+32. Ich möchte mit Karte bezahlen.
+    I want to pay by credit card.
+
+33. Möchtest du einen Beleg?
+    Do you want a receipt?
+
+34. Ich möchte verstehen.
+    I want to understand.
+
+35. Mir geht’s gut.
+    I am good/fine.
+
+36. Ich habe keinen Hunger.
+    I am not hungry.
+
+37. Ich habe gefrühstückt.
+    I had breakfast.
+
+38. Ich möchte zu dieser Adresse fahren.
+    I want to go to this address.
+
+39. Ich möchte dieses Gericht bestellen.
+    I want to order this meal.
+
+40. Ich möchte eine Cola und Hähnchen mit Reis bestellen.
+    I want to order one cola and chicken and rice.
